@@ -4,7 +4,8 @@ import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
-import { Activity, Database, Link as LinkIcon } from "lucide-react"
+import { Activity, Database, Link as LinkIcon, CheckCircle2, ExternalLink } from "lucide-react"
+import { verifyData } from "@/app/actions/verify"
 
 type EmissionData = {
   id: string
@@ -13,10 +14,35 @@ type EmissionData = {
   co2_level: number
 }
 
+type VerificationResult = {
+  hash: string
+  txnId: string
+  timestamp: string
+  recordCount: number
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<EmissionData[]>([])
   const [latestCo2, setLatestCo2] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Phase 4 Blockchain States
+  const [isVerifying, setIsVerifying] = useState(false)
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
+  const [verificationError, setVerificationError] = useState<string | null>(null)
+
+  const handleVerify = async () => {
+    try {
+      setIsVerifying(true)
+      setVerificationError(null)
+      const result = await verifyData()
+      setVerificationResult(result)
+    } catch (err: any) {
+      setVerificationError(err.message || "Verification failed")
+    } finally {
+      setIsVerifying(false)
+    }
+  }
 
   useEffect(() => {
     // 1. Fetch historical data on mount
@@ -74,8 +100,10 @@ export default function DashboardPage() {
   }, [])
 
   // Format date for chart X-axis
-  const formatTime = (timeStr: string) => {
+  const formatTime = (timeStr: any) => {
+    if (!timeStr) return '';
     const date = new Date(timeStr)
+    if (isNaN(date.getTime())) return '';
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   }
 
@@ -144,7 +172,7 @@ export default function DashboardPage() {
                       contentStyle={{ backgroundColor: '#171717', border: '1px solid #262626', borderRadius: '8px', color: '#f5f5f5' }}
                       itemStyle={{ color: '#10b981' }}
                       labelFormatter={formatTime}
-                      formatter={(value: number) => [`${value} ppm`, 'CO₂ Level']}
+                      formatter={(value: any) => [`${value} ppm`, 'CO₂ Level']}
                     />
                     <Line
                       type="monotone"
@@ -179,12 +207,12 @@ export default function DashboardPage() {
               </div>
               {latestCo2 !== null && (
                 <div className="mt-4 flex items-center gap-2 text-sm">
-                  {latestCo2 < 1000 ? (
+                  {latestCo2 < 800 ? (
                     <span className="text-emerald-400/90 flex items-center gap-1.5 bg-emerald-400/10 px-2.5 py-1 rounded-md">
                       <div className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       Excellent Air Quality
                     </span>
-                  ) : latestCo2 < 2000 ? (
+                  ) : latestCo2 < 1000 ? (
                     <span className="text-yellow-400/90 flex items-center gap-1.5 bg-yellow-400/10 px-2.5 py-1 rounded-md">
                       <div className="w-1.5 h-1.5 rounded-full bg-yellow-400" />
                       Moderate Air Quality
@@ -200,10 +228,10 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          {/* Blockchain Verify Card Placeholder */}
+          {/* Blockchain Verify Card */}
           <Card className="bg-gradient-to-br from-indigo-950/40 to-purple-950/40 border-indigo-900/30 backdrop-blur-xl shadow-2xl relative overflow-hidden group">
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl group-hover:bg-purple-500/20 transition-all duration-500" />
-            <CardHeader>
+            <CardHeader className="pb-4">
               <CardTitle className="text-indigo-200 flex items-center gap-2">
                 <LinkIcon className="h-5 w-5" />
                 Blockchain Status
@@ -211,14 +239,67 @@ export default function DashboardPage() {
               <CardDescription className="text-indigo-300/60">Phase 4 Verification Layer</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="rounded-lg border border-indigo-500/20 bg-indigo-950/20 p-4 text-center">
-                <p className="text-sm text-indigo-300/80 mb-3">
-                  Awaiting Phase 4 completion to enable Web3 data anchoring.
-                </p>
-                <div className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600/50 text-indigo-100 hover:bg-indigo-600 h-10 px-4 py-2 w-full max-w-[200px] cursor-not-allowed opacity-50">
-                  Verify Data
+              {verificationResult ? (
+                <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                  <div className="flex items-center gap-2 text-emerald-400 font-medium">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span>Data Anchored Successfully</span>
+                  </div>
+
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="bg-neutral-950/50 p-3 rounded-md border border-indigo-500/20">
+                      <div className="text-indigo-400 mb-1">SHA-256 Hash</div>
+                      <div className="text-neutral-300 break-all">{verificationResult.hash}</div>
+                    </div>
+
+                    <div className="bg-neutral-950/50 p-3 rounded-md border border-indigo-500/20">
+                      <div className="text-indigo-400 mb-1 flex items-center justify-between">
+                        <span>Simulated Txn Receipt</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </div>
+                      <div className="text-neutral-400 truncate">{verificationResult.txnId}</div>
+                      <div className="text-neutral-500 mt-2 flex justify-between">
+                        <span>Records: {verificationResult.recordCount}</span>
+                        <span>{new Date(verificationResult.timestamp).toLocaleTimeString()}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setVerificationResult(null)}
+                    className="w-full mt-2 text-indigo-400 hover:text-indigo-300 text-sm font-medium transition-colors"
+                  >
+                    Close Receipt
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-lg border border-indigo-500/20 bg-indigo-950/20 p-4 text-center">
+                  <p className="text-sm text-indigo-300/80 mb-4">
+                    Generate a cryptographic hash of the latest sensor data and simulate blockchain anchoring.
+                  </p>
+
+                  {verificationError && (
+                    <div className="mb-4 text-xs text-red-400 bg-red-400/10 p-2 rounded border border-red-500/20">
+                      {verificationError}
+                    </div>
+                  )}
+
+                  <button
+                    onClick={handleVerify}
+                    disabled={isVerifying || data.length === 0}
+                    className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-indigo-600/80 text-white hover:bg-indigo-500 h-10 px-4 py-2 w-full max-w-[200px] hover:shadow-[0_0_15px_rgba(79,70,229,0.5)] duration-300"
+                  >
+                    {isVerifying ? (
+                      <span className="flex items-center gap-2">
+                        <div className="h-4 w-4 rounded-full border-2 border-white/20 border-t-white animate-spin" />
+                        Generating Proof...
+                      </span>
+                    ) : (
+                      "Verify Data"
+                    )}
+                  </button>
+                </div>
+              )}
             </CardContent>
           </Card>
 
