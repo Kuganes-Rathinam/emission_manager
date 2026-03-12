@@ -236,7 +236,7 @@ export default function DashboardPage() {
                 <LinkIcon className="h-5 w-5" />
                 Blockchain Status
               </CardTitle>
-              <CardDescription className="text-indigo-300/60">Phase 4 Verification Layer</CardDescription>
+              <CardDescription className="text-indigo-300/60">Verification Layer</CardDescription>
             </CardHeader>
             <CardContent>
               {verificationResult ? (
